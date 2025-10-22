@@ -1,3 +1,4 @@
+// js/calculadora.js
 document.addEventListener("DOMContentLoaded", () => {
   const sistemaSel  = document.getElementById("sistema");
   const colorSel    = document.getElementById("color");
@@ -6,28 +7,120 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultado   = document.getElementById("resultado");
   const calcularBtn = document.getElementById("calcular");
 
-  // 1) Mapa de sistema -> fichero real en /data
+  // ⚠️ IMPORTANTE: revisa el nombre real del fichero de Limecrete.
+  // Si en /data está "nature_new.json", cambia "natture_new.json" por "nature_new.json".
   const FILE_BY_SYSTEM = {
     concrete:       "sttandard_new.json",
     monocrete:      "evoluttion_new.json",
     concrete_pool:  "atlanttic.json",
     easycret:       "efectto_new.json",
     concrete_pox:   "industrial.json",
-    limecrete:      "natture_new.json",
+    limecrete:      "natture_new.json", // <-- cambia a "nature_new.json" si es tu caso
   };
 
-  // 2) Campos que NO son productos (metadatos)
   const META_FIELDS = new Set([
     "id", "color", "subcolor", "color_lux", "color_myr",
     "arcocem_basic", "color_beton"
   ]);
 
   const DATA_BASE_PATH = "./data/";
+  const EQUIV_FILE = `${DATA_BASE_PATH}color_equivalencias2.json`;
 
-  let data = [];        // dataset del sistema actual
-  let productos = [];   // columnas de producto del dataset actual
+  let data = [];              // dataset del sistema actual
+  let productos = [];         // columnas de producto del dataset actual
   let colorKey = "color_lux"; // clave de color a usar (o "color" si lux está vacío)
 
+  // ====== Equivalencias / Ocultación ======
+  let equiv = { renombrar: {}, ocultar: [] };
+  const equivNorm = { map: new Map(), hide: new Set(), ready: false };
+
+  const norm = (s) =>
+    (s ?? "")
+      .toString()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita tildes
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+
+  function prepararEquivalencias() {
+    equivNorm.map = new Map(
+      Object.entries(equiv.renombrar || {}).map(([k, v]) => [norm(k), v])
+    );
+    equivNorm.hide = new Set((equiv.ocultar || []).map(norm));
+    equivNorm.ready = true;
+  }
+
+  async function cargarEquivalencias() {
+    try {
+      const r = await fetch(EQUIV_FILE, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      equiv = await r.json();
+    } catch (_e) {
+      // Si no existe el archivo, seguimos sin transformar/ocultar
+      equiv = { renombrar: {}, ocultar: [] };
+    } finally {
+      prepararEquivalencias();
+    }
+  }
+
+  const colorOculto = (raw) => equivNorm.hide.has(norm(raw));
+  const colorAMostrar = (raw) => equivNorm.map.get(norm(raw)) || raw;
+
+  // ====== Utilidades UI ======
+  const esc = (s) =>
+    String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+  function fillSelectSimple(select, values, labelFn = (v) => v, placeholder) {
+    const head = placeholder ? `<option value="" disabled selected>${esc(placeholder)}</option>` : "";
+    if (!values.length) {
+      select.innerHTML = head || `<option value="" disabled selected>Sin opciones</option>`;
+      return;
+    }
+    select.innerHTML =
+      head + values.map(v => `<option value="${esc(v)}">${esc(labelFn(v))}</option>`).join("");
+  }
+
+  function fillSelectOptions(select, options, placeholder) {
+    // options: [{value, label}]
+    const head = placeholder ? `<option value="" disabled selected>${esc(placeholder)}</option>` : "";
+    if (!options.length) {
+      select.innerHTML = head || `<option value="" disabled selected>Sin opciones</option>`;
+      return;
+    }
+    select.innerHTML =
+      head + options.map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join("");
+  }
+
+  function resetSelect(select, placeholder) {
+    select.innerHTML = `<option value="" disabled selected>${esc(placeholder)}</option>`;
+  }
+
+  function setSelectLoading(select, text) {
+    select.innerHTML = `<option value="" disabled selected>${esc(text)}</option>`;
+  }
+
+  function prettify(key) {
+    return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function limpiarResultado() {
+    resultado.innerHTML = "";
+  }
+
+  function pintarError(msg) {
+    resultado.innerHTML = `<div class="alert alert-danger">${esc(msg)}</div>`;
+  }
+
+  function isNumericColumn(key) {
+    for (let i = 0; i < Math.min(10, data.length); i++) {
+      const v = data[i]?.[key];
+      if (v == null || v === "") continue;
+      return !isNaN(parseFloat(v));
+    }
+    return false;
+  }
+
+  // ====== Carga de un sistema ======
   async function cargarSistema(sistema) {
     const file = FILE_BY_SYSTEM[sistema];
     if (!file) {
@@ -51,47 +144,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
       data = json;
 
-      // 2.1) Determinar si usamos color_lux o color
+      // ¿Usamos color_lux o color?
       const hayLux = data.some(r => (r.color_lux || "").toString().trim() !== "");
       colorKey = hayLux ? "color_lux" : "color";
 
-      // 2.2) Rellenar colores únicos
-      const colores = [...new Set(
+      // --- Colores únicos del dataset ---
+      const baseColors = [...new Set(
         data.map(r => (r[colorKey] || "").toString().trim())
       )].filter(v => v !== "");
-      if (colores.length === 0) {
-        // como último recurso, usa combinación color+subcolor
+
+      let colorOptions = baseColors
+        // 1) Ocultamos los que tocan (si hay equivalencias)
+        .filter(c => !equivNorm.ready || !colorOculto(c))
+        // 2) Convertimos a {value, label} usando el nombre Luxury
+        .map(c => ({ value: c, label: equivNorm.ready ? colorAMostrar(c) : c }));
+
+      // Orden por etiqueta visible (es-ES)
+      colorOptions.sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
+
+      // Si no hay colores, intento fallback color + subcolor
+      if (!colorOptions.length) {
         const fallback = [...new Set(
           data.map(r => {
             const c = (r.color || "").toString().trim();
             const s = (r.subcolor || "").toString().trim();
             return [c, s].filter(Boolean).join(" - ");
           })
-        )].filter(Boolean);
-        fillSelect(colorSel, fallback);
-      } else {
-        fillSelect(colorSel, colores);
+        )].filter(Boolean).map(x => ({ value: x, label: x }));
+        colorOptions = fallback;
       }
 
-      // 2.3) Detectar columnas de producto (numéricas y no meta)
+      fillSelectOptions(colorSel, colorOptions, "Selecciona un color");
+
+      // --- Columnas de producto (numéricas y no meta) ---
       const sample = data[0];
       productos = Object.keys(sample)
         .filter(k => !META_FIELDS.has(k))
         .filter(k => typeof sample[k] === "number" || isNumericColumn(k));
 
-      if (productos.length === 0) {
-        // si no detecta numéricas, usa todas menos meta (hay casos con números como string)
+      if (!productos.length) {
         productos = Object.keys(sample).filter(k => !META_FIELDS.has(k));
       }
 
-      // Opciones más legibles: convierto snake_case a títulos
-      fillSelect(productoSel, productos, (k) => prettify(k));
-
+      fillSelectSimple(productoSel, productos, (k) => prettify(k), "Selecciona un producto");
       limpiarResultado();
     } catch (err) {
       console.error("Error cargando JSON:", err);
       pintarError("No se pudo cargar el sistema seleccionado. Revisa la ruta de datos o el formato del JSON.");
-      // deja los selects en estado inicial
       resetSelect(colorSel, "Selecciona un sistema");
       resetSelect(productoSel, "Selecciona un sistema");
       data = [];
@@ -99,45 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function isNumericColumn(key) {
-    // mira en algunas filas si es convertible a número
-    for (let i = 0; i < Math.min(10, data.length); i++) {
-      const v = data[i]?.[key];
-      if (v == null || v === "") continue;
-      return !isNaN(parseFloat(v));
-    }
-    return false;
-  }
-
-  function fillSelect(select, values, labelFn = (v) => v) {
-    if (!values.length) {
-      resetSelect(select, "Sin opciones");
-      return;
-    }
-    select.innerHTML = values.map(v => `<option value="${v}">${labelFn(v)}</option>`).join("");
-  }
-
-  function resetSelect(select, placeholder) {
-    select.innerHTML = `<option value="" disabled selected>${placeholder}</option>`;
-  }
-
-  function setSelectLoading(select, text) {
-    select.innerHTML = `<option value="" disabled selected>${text}</option>`;
-  }
-
-  function prettify(key) {
-    // microdeck_wt -> Microdeck WT ; small_grain -> Small Grain
-    return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  }
-
-  function limpiarResultado() {
-    resultado.innerHTML = "";
-  }
-
-  function pintarError(msg) {
-    resultado.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
-  }
-
+  // ====== Eventos ======
   sistemaSel.addEventListener("change", (e) => {
     cargarSistema(e.target.value);
   });
@@ -156,7 +217,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Busca la fila por color (o por combinación como fallback)
+    // Busca la fila por color (o por combinación color - subcolor)
     let fila = data.find(r => (r[colorKey] || "").toString().trim() === color);
     if (!fila && color.includes(" - ")) {
       const [c, s] = color.split(" - ").map(v => v.trim());
@@ -176,16 +237,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const total = pigmentoBase * kg;
 
+    // Nombre visible del color (Luxury) para el resultado
+    const colorVisible = equivNorm.ready ? colorAMostrar(color) : color;
+
     resultado.innerHTML = `
       <div class="card p-3">
         <h5>Resultado</h5>
-        <p><strong>Producto:</strong> ${prettify(producto)}</p>
-        <p><strong>Color:</strong> ${color}</p>
-        <p><strong>Kilos:</strong> ${kg} kg</p>
-        <p><strong>Peso total del pigmento:</strong> ${total.toFixed(2)} g</p>
+        <p><strong>Producto:</strong> ${esc(prettify(producto))}</p>
+        <p><strong>Color:</strong> ${esc(colorVisible)}</p>
+        <p><strong>Kilos:</strong> ${esc(kg)} kg</p>
+        <p><strong>Peso total del pigmento:</strong> ${esc(total.toFixed(2))} g</p>
       </div>`;
   });
 
-  // Carga inicial
-  cargarSistema(sistemaSel.value);
+  // Carga inicial: primero equivalencias, luego el sistema por defecto
+  cargarEquivalencias().finally(() => cargarSistema(sistemaSel.value));
 });
