@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultado   = document.getElementById("resultado");
   const calcularBtn = document.getElementById("calcular");
 
-  // 1) Mapa de sistema -> fichero real en /data
+  // 1) Sistema -> fichero en /data (ajusta nombres si alguno difiere)
   const FILE_BY_SYSTEM = {
     concrete:       "sttandard_new.json",
     monocrete:      "evoluttion_new.json",
@@ -16,176 +16,189 @@ document.addEventListener("DOMContentLoaded", () => {
     limecrete:      "natture_new.json",
   };
 
-  // 2) Campos que NO son productos (metadatos)
+  // 2) Campos meta (no productos)
   const META_FIELDS = new Set([
-    "id", "color", "subcolor", "color_lux", "color_myr",
-    "arcocem_basic", "color_beton"
+    "id","color","subcolor","color_lux","color_myr","arcocem_basic","color_beton"
   ]);
 
-  const DATA_BASE_PATH = "./data/";
+  // 3) (Opcional) imagen por producto (usa tus rutas si las tienes)
+  const IMAGE_BY_PRODUCT = {
+    concrete_base: "img/concrete_base.jpg",
+    concrete_wall_wt: "img/concrete_wall.jpg",
+    concrete_floor_wt: "img/concrete_floor.jpg",
+    concrete_stone_wt: "img/concrete_stone.jpg",
+    concrete_wall_dsv: "img/concrete_wall.jpg",
+    concrete_floor_dsv: "img/concrete_floor.jpg",
+    concrete_stone_dsv: "img/concrete_stone.jpg",
+    concrete_wall_top100: "img/concrete_wall.jpg",
+    concrete_floor_top100: "img/concrete_floor.jpg",
+    concrete_stone_top100: "img/concrete_stone.jpg",
 
-  let data = [];        // dataset del sistema actual
-  let productos = [];   // columnas de producto del dataset actual
-  let colorKey = "color_lux"; // clave de color a usar (o "color" si lux está vacío)
+    monocrete_base: "img/monocrete_base.jpg",
+    monocrete_wall_wt: "img/monocrete_wall.jpg",
+    monocrete_floor_wt: "img/monocrete_floor.jpg",
+    monocrete_wall_dsv: "img/monocrete_wall.jpg",
+    monocrete_floor_dsv: "img/monocrete_floor.jpg",
+    monocrete_wall_top100: "img/monocrete_wall.jpg",
+    monocrete_floor_top100: "img/monocrete_floor.jpg",
+    monocrete_stone_top100: "img/monocrete_stone.jpg",
+
+    concrete_pool_grand: "img/concrete_pool.jpg",
+    concrete_pool_medium: "img/concrete_pool.jpg",
+
+    easycret_thin: "img/easycret_thin.jpg",
+    easycret_medium: "img/easycret_medium.jpg",
+    easycret_basic: "img/easycret_basic.jpg",
+    easycret_extra: "img/easycret_extra.jpg",
+
+    concrete_pox_extra: "img/concrete_pox_extra.webp",
+    concrete_pox_medium: "img/concrete_pox_medium.webp",
+    concrete_pox_basic: "img/concrete_pox_basic.webp",
+    concrete_pox_thin: "img/concrete_pox_thin.webp",
+
+    limecrete_thin_wt: "img/limecrete_thin.webp",
+    limecrete_medium_wt: "img/limecrete_medium.webp",
+    limecrete_basic_wt: "img/limecrete_basic.webp",
+    limecrete_extra_wt: "img/limecrete_extra.webp",
+    limecrete_thin_dsv: "img/limecrete_thin.webp",
+    limecrete_medium_dsv: "img/limecrete_medium.webp",
+    limecrete_basic_dsv: "img/limecrete_basic.webp",
+    limecrete_extra_dsv: "img/limecrete_extra.webp",
+    limecrete_thin_top100: "img/limecrete_thin.webp",
+    limecrete_medium_top100: "img/limecrete_medium.webp",
+    limecrete_basic_top100: "img/limecrete_basic.webp",
+    limecrete_extra_top100: "img/limecrete_extra.webp",
+  };
+
+  const DATA_BASE_PATH = "./data/";
+  let data = [];
+  let productos = [];
+  let colorKey = "color_lux";
+
+  // utilidades
+  function resetSelect(select, placeholder) {
+    select.innerHTML = `<option value="" disabled selected>${placeholder}</option>`;
+  }
+  function setSelectLoading(select, text) {
+    select.innerHTML = `<option value="" disabled selected>${text}</option>`;
+  }
+  function fillSelect(select, values, labelFn = (v) => v) {
+    if (!values.length) return resetSelect(select, "Sin opciones");
+    select.innerHTML = values.map(v => `<option value="${v}">${labelFn(v)}</option>`).join("");
+  }
+  function prettify(key) {
+    return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+  function pintarError(msg) {
+    resultado.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
+  }
+  function limpiarResultado() { resultado.innerHTML = ""; }
 
   async function cargarSistema(sistema) {
     const file = FILE_BY_SYSTEM[sistema];
-    if (!file) {
-      pintarError("Sistema desconocido.");
-      return;
-    }
+    if (!file) { pintarError("Sistema desconocido."); return; }
 
-    const url = `${DATA_BASE_PATH}${file}`;
     limpiarResultado();
     setSelectLoading(colorSel, "Cargando colores…");
     setSelectLoading(productoSel, "Cargando productos…");
 
     try {
-      const resp = await fetch(url, { cache: "no-store" });
+      const resp = await fetch(`${DATA_BASE_PATH}${file}`, { cache: "no-store" });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const json = await resp.json();
-
-      if (!Array.isArray(json) || json.length === 0) {
-        throw new Error("El JSON no tiene registros.");
-      }
+      if (!Array.isArray(json) || json.length === 0) throw new Error("JSON vacío");
 
       data = json;
 
-      // 2.1) Determinar si usamos color_lux o color
+      // Color key
       const hayLux = data.some(r => (r.color_lux || "").toString().trim() !== "");
       colorKey = hayLux ? "color_lux" : "color";
 
-      // 2.2) Rellenar colores únicos
+      // Colores únicos
       const colores = [...new Set(
         data.map(r => (r[colorKey] || "").toString().trim())
-      )].filter(v => v !== "");
-      if (colores.length === 0) {
-        // como último recurso, usa combinación color+subcolor
-        const fallback = [...new Set(
-          data.map(r => {
-            const c = (r.color || "").toString().trim();
-            const s = (r.subcolor || "").toString().trim();
-            return [c, s].filter(Boolean).join(" - ");
-          })
-        )].filter(Boolean);
-        fillSelect(colorSel, fallback);
-      } else {
+      )].filter(Boolean);
+      if (colores.length) {
         fillSelect(colorSel, colores);
+      } else {
+        resetSelect(colorSel, "Sin colores");
       }
 
-      // 2.3) Detectar columnas de producto (numéricas y no meta)
-      const sample = data[0];
-      productos = Object.keys(sample)
-        .filter(k => !META_FIELDS.has(k))
-        .filter(k => typeof sample[k] === "number" || isNumericColumn(k));
+      // Columnas de producto: todas las no-meta que parezcan numéricas en alguna fila
+      const claves = new Set();
+      for (const r of data) Object.keys(r).forEach(k => claves.add(k));
 
-      if (productos.length === 0) {
-        // si no detecta numéricas, usa todas menos meta (hay casos con números como string)
-        productos = Object.keys(sample).filter(k => !META_FIELDS.has(k));
-      }
+      productos = [...claves].filter(k => !META_FIELDS.has(k)).filter(k => {
+        // considerar numérica si en alguna fila es un número
+        return data.some(r => r[k] !== "" && !isNaN(parseFloat(r[k])));
+      });
 
-      // Opciones más legibles: convierto snake_case a títulos
-      fillSelect(productoSel, productos, (k) => prettify(k));
+      if (!productos.length) productos = [...claves].filter(k => !META_FIELDS.has(k));
 
+      fillSelect(productoSel, productos, prettify);
       limpiarResultado();
-    } catch (err) {
-      console.error("Error cargando JSON:", err);
-      pintarError("No se pudo cargar el sistema seleccionado. Revisa la ruta de datos o el formato del JSON.");
-      // deja los selects en estado inicial
+    } catch (e) {
+      console.error(e);
+      pintarError("No se pudo cargar el sistema seleccionado.");
       resetSelect(colorSel, "Selecciona un sistema");
       resetSelect(productoSel, "Selecciona un sistema");
-      data = [];
-      productos = [];
+      data = []; productos = [];
     }
   }
 
-  function isNumericColumn(key) {
-    // mira en algunas filas si es convertible a número
-    for (let i = 0; i < Math.min(10, data.length); i++) {
-      const v = data[i]?.[key];
-      if (v == null || v === "") continue;
-      return !isNaN(parseFloat(v));
-    }
-    return false;
-  }
-
-  function fillSelect(select, values, labelFn = (v) => v) {
-    if (!values.length) {
-      resetSelect(select, "Sin opciones");
-      return;
-    }
-    select.innerHTML = values.map(v => `<option value="${v}">${labelFn(v)}</option>`).join("");
-  }
-
-  function resetSelect(select, placeholder) {
-    select.innerHTML = `<option value="" disabled selected>${placeholder}</option>`;
-  }
-
-  function setSelectLoading(select, text) {
-    select.innerHTML = `<option value="" disabled selected>${text}</option>`;
-  }
-
-  function prettify(key) {
-    // microdeck_wt -> Microdeck WT ; small_grain -> Small Grain
-    return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  }
-
-  function limpiarResultado() {
-    resultado.innerHTML = "";
-  }
-
-  function pintarError(msg) {
-    resultado.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
-  }
-
-  sistemaSel.addEventListener("change", (e) => {
-    cargarSistema(e.target.value);
-  });
+  sistemaSel.addEventListener("change", e => cargarSistema(e.target.value));
 
   calcularBtn.addEventListener("click", () => {
     const color = colorSel.value;
     const producto = productoSel.value;
     const kg = parseFloat(kgInput.value);
 
-    if (!data.length) {
-      pintarError("Selecciona un sistema primero.");
-      return;
-    }
+    if (!data.length) return pintarError("Selecciona un sistema primero.");
     if (!color || !producto || isNaN(kg) || kg <= 0) {
-      pintarError("Rellena todos los campos correctamente antes de calcular.");
-      return;
+      return pintarError("Rellena todos los campos correctamente antes de calcular.");
     }
 
-    // Busca la fila por color (o por combinación como fallback)
-    let fila = data.find(r => (r[colorKey] || "").toString().trim() === color);
-    if (!fila && color.includes(" - ")) {
-      const [c, s] = color.split(" - ").map(v => v.trim());
-      fila = data.find(r => (r.color || "").toString().trim() === c && (r.subcolor || "").toString().trim() === s);
-    }
-    if (!fila) {
-      pintarError("No se encontró el color en el sistema seleccionado.");
-      return;
+    // --- DESGLOSE MULTI-PIGMENTO (fiel al PHP) ---
+    const filasColor = data.filter(r => (r[colorKey] || "").toString().trim() === color);
+
+    if (!filasColor.length) return pintarError("No se encontró el color en el sistema.");
+
+    let total = 0;
+    const lineas = [];
+
+    for (const r of filasColor) {
+      const base = parseFloat(r[producto]);           // p.ej. gramos por kg
+      const pigmento = (r.arcocem_basic || "").toString().trim() || "Pigmento";
+      if (!isNaN(base) && base > 0) {
+        const peso = base * kg;
+        total += peso;
+        lineas.push({ pigmento, peso });
+      }
     }
 
-    const valor = fila[producto];
-    const pigmentoBase = parseFloat(valor);
-    if (isNaN(pigmentoBase)) {
-      pintarError("Producto no disponible para este color.");
-      return;
-    }
+    if (!lineas.length) return pintarError("Producto no disponible para este color.");
 
-    const total = pigmentoBase * kg;
+    // render
+    const imgSrc = IMAGE_BY_PRODUCT[producto];
+    const imgHtml = imgSrc ? `<img src="${imgSrc}" alt="${prettify(producto)}" style="display:block;margin:auto;width:250px;">` : "";
+
+    const desgloseHtml = lineas
+      .sort((a,b) => b.peso - a.peso)
+      .map(l => `<p class="mb-1" style="text-align:center;">
+                   <strong>${l.pigmento}</strong>: ${l.peso.toFixed(2)} g / ${kg} kg
+                 </p>`).join("");
 
     resultado.innerHTML = `
       <div class="card p-3">
-        <h5>Resultado</h5>
-        <p><strong>Producto:</strong> ${prettify(producto)}</p>
-        <p><strong>Color:</strong> ${color}</p>
-        <p><strong>Kilos:</strong> ${kg} kg</p>
-        <p><strong>Peso total del pigmento:</strong> ${total.toFixed(2)} g</p>
+        ${imgHtml}
+        <p class="mt-3 mb-1" style="text-align:center;"><strong>Producto:</strong> ${prettify(producto)}</p>
+        <p class="mb-1" style="text-align:center;"><strong>Color:</strong> ${color}</p>
+        <p class="mb-3" style="text-align:center;"><strong>Peso total:</strong> ${kg} kg</p>
+        <p class="pig_tot fw-semibold text-center mb-2"><strong>Total pigmentos:</strong> ${total.toFixed(2)} g</p>
+        ${desgloseHtml}
       </div>`;
   });
 
-  // Carga inicial
+  // carga inicial
   cargarSistema(sistemaSel.value);
 });
