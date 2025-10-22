@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Calculadora de Pigmentos</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Tu JS (carga después del DOM gracias a defer) -->
+  <script src="js/calculadora.js" defer></script>
+</head>
+<body class="bg-light">
+
+  <header class="text-center py-4">
+    <img src="logo.svg" alt="Topciment" width="200">
+    <h1>Calculadora de Pigmentos</h1>
+  </header>
+
+  <main class="container my-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Sistema</label>
+        <!-- IMPORTANTE: valores = claves de sistema que espera calculadora.js -->
+        <select id="sistema" class="form-select">
+          <option value="concrete">Sttandard</option>
+          <option value="monocrete">Evoluttion</option>
+          <option value="concrete_pool">Atlanttic</option>
+          <option value="easycret">Efectto</option>
+          <option value="concrete_pox">Industtrial</option>
+          <option value="limecrete">Natture</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Color</label>
+        <!-- Será rellenado por JS con color_lux únicos del sistema -->
+        <select id="color" class="form-select">
+          <option value="" disabled selected>Selecciona un sistema</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Producto</label>
+        <!-- Será rellenado por JS según el sistema (map de producto->columna) -->
+        <select id="producto" class="form-select">
+          <option value="" disabled selected>Selecciona un sistema</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Kg del producto</label>
+        <input type="number" id="kg" class="form-control" placeholder="Ej. 10" min="0" step="0.01" inputmode="decimal">
+      </div>
+    </div>
+
+    <div class="text-center mt-4">
+      <button id="calcular" class="btn btn-primary">Calcular</button>
+    </div>
+
+    <!-- Aquí se imprime el resultado (imagen + totales + desglose) -->
+    <div id="resultado" class="mt-4"></div>
+  </main>
+
+</body>
+</html>
