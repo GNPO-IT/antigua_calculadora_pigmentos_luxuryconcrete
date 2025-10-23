@@ -1,0 +1,59 @@
+{
+  "por_sistema": {
+    "concrete": {
+      "microbase": "Concrete Base",
+      "microfino_wt": "Concrete Wall WT",
+      "microdeck_wt": "Concrete Floor WT",
+      "microstone_wt": "Concrete Stone WT",
+      "microfino_dsv": "Concrete Wall DSV",
+      "microdeck_dsv": "Concrete Floor DSV",
+      "microstone_dsv": "Concrete Stone DSV",
+      "microfino_top100": "Concrete Wall TOP100",
+      "microdeck_top100": "Concrete Floor TOP100",
+      "microstone_top100": "Concrete Stone TOP100"
+    },
+    "monocrete": {
+      "microbase": "Monocrete Base",
+      "microfino_wt": "Monocrete Wall WT",
+      "microdeck_wt": "Monocrete Floor WT",
+      "microfino_dsv": "Monocrete Wall DSV",
+      "microdeck_dsv": "Monocrete Floor DSV",
+      "microfino_top100": "Monocrete Wall TOP100",
+      "microdeck_top100": "Monocrete Floor TOP100",
+      "microstone_top100": "Monocrete Stone TOP100"
+    },
+    "concrete_pool": {
+      "aquaciment_xl": "Concrete Pool Grand",
+      "aquaciment_m": "Concrete Pool Medium"
+    },
+    "easycret": {
+      "small_grain": "Easycret Thin",
+      "medium_grain": "Easycret Medium",
+      "big_grain": "Easycret Basic",
+      "super_grain": "Easycret Extra"
+    },
+    "concrete_pox": {
+      "industtrial_xl": "Concrete Pox Extra",
+      "industtrial_base": "Concrete Pox Basic",
+      "industtrial_medio": "Concrete Pox Medium",
+      "industtrial_liso": "Concrete Pox Thin"
+    },
+    "limecrete": {
+      "natture_s_wt": "Limecrete Thin WT",
+      "natture_m_wt": "Limecrete Medium WT",
+      "natture_l_wt": "Limecrete Basic WT",
+      "natture_xl_wt": "Limecrete Extra WT",
+      "natture_s_dsv": "Limecrete Thin DSV",
+      "natture_m_dsv": "Limecrete Medium DSV",
+      "natture_l_dsv": "Limecrete Basic DSV",
+      "natture_xl_dsv": "Limecrete Extra DSV",
+      "natture_s_top100": "Limecrete Thin TOP100",
+      "natture_m_top100": "Limecrete Medium TOP100",
+      "natture_l_top100": "Limecrete Basic TOP100",
+      "natture_xl_top100": "Limecrete Extra TOP100"
+    }
+  },
+  "ocultar": {
+    "easycret": ["super_grain"] 
+  }
+}
