@@ -8,12 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ⚠️ Cambia "natture_new.json" a "nature_new.json" si ese es tu archivo real.
     const FILE_BY_SYSTEM = {
-        concrete: "sttandard_new.json",
-        monocrete: "evoluttion_new.json",
+        concrete: "sttandardjson",
+        monocrete: "evoluttionjson",
         concrete_pool: "atlanttic.json",
-        easycret: "efectto_new.json",
+        easycret: "efecttojson",
         concrete_pox: "industtrial.json",
-        limecrete: "natture_new.json"
+        limecrete: "natturejson"
     };
 
     const META_FIELDS = new Set([
