@@ -165,14 +165,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const resp = await fetch(url, { cache: "no-store" });
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status} al pedir ${url}`);
+
             const json = await resp.json();
 
-            if (!Array.isArray(json) || json.length === 0) {
-                throw new Error("El JSON no tiene registros.");
+            // 🔧 Normaliza el formato del JSON a un array de filas
+            let rows;
+            if (Array.isArray(json)) {
+                rows = json;
+            } else if (json && Array.isArray(json.data)) {
+                rows = json.data;
+            } else if (json && typeof json === "object") {
+                // Si es un objeto "diccionario", convierte a array con Object.values
+                rows = Object.values(json);
+            } else {
+                rows = [];
             }
 
-            data = json;
+            if (!Array.isArray(rows) || rows.length === 0) {
+                throw new Error("El JSON no contiene registros en un formato soportado.");
+            }
+
+            data = rows;
 
             // ¿Usamos color_lux o color?
             const hayLux = data.some(r => (r.color_lux || "").toString().trim() !== "");
@@ -206,35 +220,34 @@ document.addEventListener("DOMContentLoaded", () => {
             const sample = data[0];
             let columnas = Object.keys(sample).filter(k => !META_FIELDS.has(k));
 
-            // si hay equivalencias para este sistema, usamos SOLO esas columnas (y en ese orden)
             const labelsMap = prodNorm.labels.get(sistema);
             const hideSet = prodNorm.hide.get(sistema) || new Set();
 
             let prodOptions = [];
             if (prodNorm.ready && labelsMap && labelsMap.size) {
-                // columnas del mapeo que existan en el dataset y NO estén ocultas
                 for (const [colKey, visibleLabel] of labelsMap.entries()) {
                     if (!hideSet.has(colKey) && columnas.includes(colKey)) {
                         prodOptions.push({ value: colKey, label: visibleLabel });
                     }
                 }
             } else {
-                // fallback: detecta numéricas (o todas) y úsalas con prettify
                 let cols = columnas.filter(k => typeof sample[k] === "number" || isNumericColumn(k));
-                if (!cols.length) cols = columnas; // por si vinieran como string numérico
+                if (!cols.length) cols = columnas;
                 prodOptions = cols.map(k => ({ value: k, label: prettify(k) }));
             }
 
             fillSelectOptions(productoSel, prodOptions, "Selecciona un producto");
             limpiarResultado();
+
         } catch (err) {
-            console.error("Error cargando JSON:", err);
+            console.error("Error cargando JSON:", err); // 👈 ahora verás el motivo exacto en consola
             pintarError("No se pudo cargar el sistema seleccionado. Revisa la ruta de datos o el formato del JSON.");
             resetSelect(colorSel, "Selecciona un sistema");
             resetSelect(productoSel, "Selecciona un sistema");
             data = [];
             productos = [];
         }
+
     }
 
     // ====== Eventos ======
