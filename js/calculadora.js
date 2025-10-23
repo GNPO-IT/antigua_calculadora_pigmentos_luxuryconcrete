@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
         monocrete: "evoluttion_new.json",
         concrete_pool: "atlanttic.json",
         easycret: "efectto_new.json",
-        concrete_pox: "industrial.json",
+        concrete_pox: "industtrial.json",
         limecrete: "natture_new.json"
     };
 
@@ -190,7 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // ¿Usamos color_lux o color?
             const hayLux = data.some(r => (r.color_lux || "").toString().trim() !== "");
-            colorKey = hayLux ? "color_lux" : "color";
+            colorKey = "color";
 
             // ---- COLORES ----
             const baseColors = [...new Set(
